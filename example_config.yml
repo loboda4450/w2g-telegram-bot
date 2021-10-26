@@ -1,0 +1,14 @@
+bot_token: 1231231231:abcdefghijklmnoprstuwxyzabcdefghijk
+w2g_api_key: abcdefghijklmnoprstuwxyzabcdefghijklmnoprstuwxyzabcdefghijklmnop
+
+telethon_settings:
+  session: W2GBot
+  auto_reconnect: true
+  retry_delay: 15
+  connection_retries: -1
+  request_retries: 5
+
+  api_id: 1234567
+  api_hash: abcdefghijklmnoprstuwxyzabcdefgh
+
+log_level: DEBUG
