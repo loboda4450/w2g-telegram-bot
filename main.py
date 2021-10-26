@@ -3,7 +3,7 @@ import logging
 
 import aiohttp
 import yaml
-from json import loads
+from json import loads, dumps
 from telethon import TelegramClient, Button
 from telethon.events import NewMessage, CallbackQuery
 
@@ -13,6 +13,7 @@ async def main(config):
     # logger = logging.getLogger(__name__)
 
     api_key = 'abcdefghijklmnoprstuwxyzabcdefghijklmnoprstuwxyzabcdefghijklmnop'
+
     session = aiohttp.ClientSession()
     client = TelegramClient(**config['telethon_settings'])
     print("Starting")
@@ -33,10 +34,7 @@ async def main(config):
                     "bg_color": "#00ff00",
                     "bg_opacity": "50"}
 
-            data = {'headers': headers,
-                    'body': body}
-
-            async with session.post('https://w2g.tv/rooms/create.json', data=data) as resp:
+            async with session.post('https://w2g.tv/rooms/create.json', headers=headers, data=dumps(body)) as resp:
                 data = await resp.read()
                 streamkey = loads(data.decode('utf-8'))['streamkey']
                 await event.reply(f'https://w2g.tv/rooms/{streamkey}')
