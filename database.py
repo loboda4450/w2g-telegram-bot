@@ -41,7 +41,7 @@ def create(event: NewMessage, streamkey: str) -> bool:
 
 @db_session
 @logme
-def get_value(event: NewMessage, key: typing.Optional[str]):
+def get_value(event: NewMessage, key: typing.Optional[str] = None):
     if key == 'streamkey':
         return Room.get(ownerid=event.sender.id).streamkey
     elif key == 'chatid':

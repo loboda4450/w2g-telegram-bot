@@ -5,8 +5,10 @@ import aiohttp
 import yaml
 from json import loads, dumps
 from telethon import TelegramClient, Button
-from telethon.events import NewMessage, CallbackQuery
-from utils import headers, extract_url
+from telethon.events import NewMessage, CallbackQuery, InlineQuery
+from telethon.tl.types import InputWebDocument
+
+from utils import headers, extract_url, get_videos
 from database import get_value, create, exist
 
 
@@ -18,7 +20,10 @@ async def main(config):
     else:
         raise Exception('There is no Watch2Gather API key in config file')
 
-    session = aiohttp.ClientSession()
+    max_results = config['max_results']
+    yt_api_key = config['yt_api_key']
+
+    # session = aiohttp.ClientSession()
     client = TelegramClient(**config['telethon_settings'])
     print("Starting")
     await client.start(bot_token=config['bot_token'])
@@ -28,9 +33,9 @@ async def main(config):
     async def start(event):
         await event.reply('Witam', buttons=[Button.inline('Test')])
 
-    @client.on(NewMessage(pattern='/new'))
+    @client.on(NewMessage(pattern='/new', incoming=True))
     async def new_room(event):
-        async with session:
+        async with aiohttp.ClientSession() as session:
             if not exist(event=event):
                 url = await extract_url(event=event)
 
@@ -53,33 +58,44 @@ async def main(config):
 
             else:
                 await event.reply(
-                    f'Room assigned to your Telegram ID exists:\n\nhttps://w2g.tv/rooms/{get_value(event=event, key="streamkey")}')
+                    f'Room assigned to your Telegram ID exists:'
+                    f'\n\nhttps://w2g.tv/rooms/{get_value(event=event, key="streamkey")}')
 
-    # @client.on(NewMessage(incoming=True))
-    # async def play(event):
-    #     async with session:
-    #         url = extract_url(event=event)
-    #
-    #         body = {"w2g_api_key": api_key,
-    #                 "share": url}
-    #
-    #         streamkey = ...
-    #
-    #         async with session.post(
-    #                 f'https://api.w2g.tv/rooms/{streamkey}/playlists/current/playlist_items/sync_update',
-    #                 headers=headers, data=dumps(body)) as resp:
-    #             if resp.status == 200:
-    #                 ...
-    #             else:
-    #                 logger.debug(f'Status: {resp.status} Data: {await resp.read()}')
-    #                 await event.reply('Something went wrong, try again :<')
+    @client.on(NewMessage(pattern='/add', incoming=True))
+    async def update(event):
+        async with aiohttp.ClientSession() as session:
+            url = await extract_url(event=event)
 
-    @client.on(NewMessage(pattern='/add'))
-    async def add(event):
-        ...
+            body = {"w2g_api_key": api_key,
+                    "add_items": [{"url": "https://www.youtube.com/watch?v=zfL1I7WpEdk", "title": "HGW"}]}
 
-    @client.on(CallbackQuery(pattern='Test'))
-    async def reply(event):
+            streamkey = get_value(event=event, key='streamkey')
+
+            async with session.post(
+                    f'https://api.w2g.tv/rooms/{streamkey}/playlists/current/playlist_items/sync_update',
+                    headers=headers, data=dumps(body)) as resp:
+                if resp.status == 200:
+                    await event.reply('Updated your current playlist with shared video!')
+                else:
+                    logger.debug(f'Status: {resp.status} Data: {await resp.read()}')
+                    await event.reply('Something went wrong, try again :<')
+
+    @client.on(InlineQuery(pattern="/update"))
+    async def update_inline(event):
+        videos = await get_videos(type='video', search_query=event.text[7:], api_key=yt_api_key, session=aiohttp.ClientSession(),
+                                  max_result=max_results)
+        await event.answer([event.builder.article(title=video['snippet']['title'],
+                                                  description=f"Published by: {video['snippet']['channelTitle']}",
+                                                  thumb=InputWebDocument(
+                                                      url=video['snippet']['thumbnails']['default']['url'],
+                                                      size=0,
+                                                      mime_type='image/jpg',
+                                                      attributes=[]),
+                                                  text=f"/add https://www.youtube.com/watch?v={video['id']['videoId']}")
+                            for video in videos])
+
+    @client.on(NewMessage(pattern='/play'))
+    async def play(event):
         ...
 
     async with client:
