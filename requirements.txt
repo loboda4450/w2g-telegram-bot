@@ -1,3 +1,4 @@
 Telethon~=1.23.0
 aiohttp~=3.7.4.post0
 PyYAML~=6.0
+pony~=0.7.14
