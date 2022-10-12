@@ -1,5 +1,7 @@
 bot_token: 1231231231:abcdefghijklmnoprstuwxyzabcdefghijk
 w2g_api_key: abcdefghijklmnoprstuwxyzabcdefghijklmnoprstuwxyzabcdefghijklmnop
+yt_api_key: 123456789101112131415161718192021222324
+max_results: 10
 
 telethon_settings:
   session: W2GBot
