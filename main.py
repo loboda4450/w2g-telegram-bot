@@ -92,7 +92,7 @@ async def main(config):
                                       search_query=event.text[7:],
                                       api_key=yt_api_key,
                                       session=aiohttp.ClientSession(),
-                                      max_result=max_results)
+                                      max_results=max_results)
 
             await event.answer([event.builder.article(title=video['snippet']['title'],
                                                       description=f"Published by: {video['snippet']['channelTitle']}",
