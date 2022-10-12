@@ -5,7 +5,7 @@ import aiohttp
 import yaml
 from json import loads, dumps
 from telethon import TelegramClient, Button
-from telethon.events import NewMessage, CallbackQuery, InlineQuery
+from telethon.events import NewMessage, InlineQuery
 from telethon.tl.types import InputWebDocument
 
 from utils import headers, extract_url, get_videos
@@ -20,10 +20,15 @@ async def main(config):
     else:
         raise Exception('There is no Watch2Gather API key in config file')
 
-    max_results = config['max_results']
-    yt_api_key = config['yt_api_key']
+    if config['max_results']:
+        max_results = config['max_results']
 
-    # session = aiohttp.ClientSession()
+    if config['yt_api_key']:
+        yt_api_key = config['yt_api_key']
+    else:
+        raise Exception('There is no YouTube API key in config file')
+
+    session = aiohttp.ClientSession()
     client = TelegramClient(**config['telethon_settings'])
     print("Starting")
     await client.start(bot_token=config['bot_token'])
@@ -35,7 +40,7 @@ async def main(config):
 
     @client.on(NewMessage(pattern='/new', incoming=True))
     async def new_room(event):
-        async with aiohttp.ClientSession() as session:
+        if not session.closed:
             if not exist(event=event):
                 url = await extract_url(event=event)
 
@@ -61,13 +66,13 @@ async def main(config):
                     f'Room assigned to your Telegram ID exists:'
                     f'\n\nhttps://w2g.tv/rooms/{get_value(event=event, key="streamkey")}')
 
-    @client.on(NewMessage(pattern='/add', incoming=True))
+    @client.on(NewMessage(pattern='/update', incoming=True))
     async def update(event):
-        async with aiohttp.ClientSession() as session:
+        if not session.closed:
             url = await extract_url(event=event)
 
             body = {"w2g_api_key": api_key,
-                    "add_items": [{"url": "https://www.youtube.com/watch?v=zfL1I7WpEdk", "title": "HGW"}]}
+                    "add_items": [{"url": url, "title": "HGW"}]}
 
             streamkey = get_value(event=event, key='streamkey')
 
@@ -82,21 +87,59 @@ async def main(config):
 
     @client.on(InlineQuery(pattern="/update"))
     async def update_inline(event):
-        videos = await get_videos(type='video', search_query=event.text[7:], api_key=yt_api_key, session=aiohttp.ClientSession(),
-                                  max_result=max_results)
-        await event.answer([event.builder.article(title=video['snippet']['title'],
-                                                  description=f"Published by: {video['snippet']['channelTitle']}",
-                                                  thumb=InputWebDocument(
-                                                      url=video['snippet']['thumbnails']['default']['url'],
-                                                      size=0,
-                                                      mime_type='image/jpg',
-                                                      attributes=[]),
-                                                  text=f"/add https://www.youtube.com/watch?v={video['id']['videoId']}")
-                            for video in videos])
+        if not session.closed:
+            videos = await get_videos(type='video',
+                                      search_query=event.text[7:],
+                                      api_key=yt_api_key,
+                                      session=aiohttp.ClientSession(),
+                                      max_result=max_results)
+
+            await event.answer([event.builder.article(title=video['snippet']['title'],
+                                                      description=f"Published by: {video['snippet']['channelTitle']}",
+                                                      thumb=InputWebDocument(
+                                                          url=video['snippet']['thumbnails']['default']['url'],
+                                                          size=0,
+                                                          mime_type='image/jpg',
+                                                          attributes=[]),
+                                                      text=f"/update https://www.youtube.com/watch?v={video['id']['videoId']}")
+                                for video in videos])
+
 
     @client.on(NewMessage(pattern='/play'))
     async def play(event):
-        ...
+        if not session.closed:
+            url = await extract_url(event=event)
+
+            body = {"w2g_api_key": api_key,
+                    "item_url": url}
+
+            async with session.post(
+                    f'https://api.w2g.tv/rooms/{get_value(event=event, key="streamkey")}/sync_update',
+                    headers=headers, data=dumps(body)) as resp:
+                if resp.status == 200:
+                    await event.reply('Playing immediately shared video!')
+                else:
+                    logger.debug(f'Status: {resp.status} Data: {await resp.read()}')
+                    await event.reply('Something went wrong, try again :<')
+
+    @client.on(InlineQuery(pattern='/play'))
+    async def play_inline(event):
+        if not session.closed:
+            videos = await get_videos(type='video',
+                                      search_query=event.text[7:],
+                                      api_key=yt_api_key,
+                                      session=aiohttp.ClientSession(),
+                                      max_results=max_results)
+
+            await event.answer([event.builder.article(title=video['snippet']['title'],
+                                                      description=f"Published by: {video['snippet']['channelTitle']}",
+                                                      thumb=InputWebDocument(
+                                                          url=video['snippet']['thumbnails']['default']['url'],
+                                                          size=0,
+                                                          mime_type='image/jpg',
+                                                          attributes=[]),
+                                                      text=f"/play https://www.youtube.com/watch?v={video['id']['videoId']}")
+                                for video in videos])
 
     async with client:
         print("Good morning!")
