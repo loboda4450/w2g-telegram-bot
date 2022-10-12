@@ -6,9 +6,8 @@ import yaml
 from json import loads, dumps
 from telethon import TelegramClient, Button
 from telethon.events import NewMessage, InlineQuery
-from telethon.tl.types import InputWebDocument
 
-from utils import headers, extract_url, get_videos
+from utils import headers, extract_url, get_videos, parse_answer
 from database import get_value, create, exist
 
 
@@ -41,9 +40,8 @@ async def main(config):
     @client.on(NewMessage(pattern='/new', incoming=True))
     async def new_room(event):
         if not session.closed:
+            url = await extract_url(event=event)
             if not exist(event=event):
-                url = await extract_url(event=event)
-
                 body = {"w2g_api_key": api_key,
                         "share": url,
                         "bg_color": "#00ff00",
@@ -62,9 +60,25 @@ async def main(config):
                         await event.reply('Something went wrong, try again :<')
 
             else:
-                await event.reply(
-                    f'Room assigned to your Telegram ID exists:'
-                    f'\n\nhttps://w2g.tv/rooms/{get_value(event=event, key="streamkey")}')
+                body = {"w2g_api_key": api_key,
+                        "add_items": [{"url": url, "title": "TBD"}]}
+
+                async with session.post(
+                        f'https://api.w2g.tv/rooms/{get_value(event=event, key="streamkey")}/playlists/current/playlist_items/sync_update',
+                        headers=headers, data=dumps(body)) as resp:
+                    if resp.status == 200:
+                        await event.reply(
+                            f'Room assigned to your Telegram ID exists:'
+                            f'\n\nhttps://w2g.tv/rooms/{get_value(event=event, key="streamkey")}\n\n'
+                            f'Updated with shared video!')
+                    else:
+                        logger.debug(f'Status: {resp.status} Data: {await resp.read()}')
+                        await event.reply('Something went wrong, try again :<')
+
+    @client.on(InlineQuery(pattern='/new'))
+    async def new_inline(event):
+        if not session.closed:
+            await parse_answer(event=event, operation='/new', yt_api_key=yt_api_key, max_results=max_results)
 
     @client.on(NewMessage(pattern='/update', incoming=True))
     async def update(event):
@@ -72,12 +86,10 @@ async def main(config):
             url = await extract_url(event=event)
 
             body = {"w2g_api_key": api_key,
-                    "add_items": [{"url": url, "title": "HGW"}]}
-
-            streamkey = get_value(event=event, key='streamkey')
+                    "add_items": [{"url": url, "title": " "}]}
 
             async with session.post(
-                    f'https://api.w2g.tv/rooms/{streamkey}/playlists/current/playlist_items/sync_update',
+                    f'https://api.w2g.tv/rooms/{get_value(event=event, key="streamkey")}/playlists/current/playlist_items/sync_update',
                     headers=headers, data=dumps(body)) as resp:
                 if resp.status == 200:
                     await event.reply('Updated your current playlist with shared video!')
@@ -88,22 +100,7 @@ async def main(config):
     @client.on(InlineQuery(pattern="/update"))
     async def update_inline(event):
         if not session.closed:
-            videos = await get_videos(type='video',
-                                      search_query=event.text[7:],
-                                      api_key=yt_api_key,
-                                      session=aiohttp.ClientSession(),
-                                      max_results=max_results)
-
-            await event.answer([event.builder.article(title=video['snippet']['title'],
-                                                      description=f"Published by: {video['snippet']['channelTitle']}",
-                                                      thumb=InputWebDocument(
-                                                          url=video['snippet']['thumbnails']['default']['url'],
-                                                          size=0,
-                                                          mime_type='image/jpg',
-                                                          attributes=[]),
-                                                      text=f"/update https://www.youtube.com/watch?v={video['id']['videoId']}")
-                                for video in videos])
-
+            await parse_answer(event=event, operation='/update', yt_api_key=yt_api_key, max_results=max_results)
 
     @client.on(NewMessage(pattern='/play'))
     async def play(event):
@@ -125,21 +122,7 @@ async def main(config):
     @client.on(InlineQuery(pattern='/play'))
     async def play_inline(event):
         if not session.closed:
-            videos = await get_videos(type='video',
-                                      search_query=event.text[7:],
-                                      api_key=yt_api_key,
-                                      session=aiohttp.ClientSession(),
-                                      max_results=max_results)
-
-            await event.answer([event.builder.article(title=video['snippet']['title'],
-                                                      description=f"Published by: {video['snippet']['channelTitle']}",
-                                                      thumb=InputWebDocument(
-                                                          url=video['snippet']['thumbnails']['default']['url'],
-                                                          size=0,
-                                                          mime_type='image/jpg',
-                                                          attributes=[]),
-                                                      text=f"/play https://www.youtube.com/watch?v={video['id']['videoId']}")
-                                for video in videos])
+            await parse_answer(event=event, operation='/play', yt_api_key=yt_api_key, max_results=max_results)
 
     async with client:
         print("Good morning!")
