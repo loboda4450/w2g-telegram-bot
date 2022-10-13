@@ -1,7 +1,7 @@
 from pony.orm import *
 from logme import logme
 import typing
-from telethon.events import NewMessage, CallbackQuery
+from telethon.events import NewMessage, CallbackQuery, InlineQuery
 
 db = Database("sqlite", "w2g.sqlite", create_db=True)
 
@@ -18,7 +18,7 @@ db.generate_mapping(create_tables=True)
 
 @db_session
 @logme
-def exist(event: NewMessage, streamkey: typing.Optional[str] = None, chatid: typing.Optional[int] = None) -> bool:
+def exist(event: typing.Union[NewMessage, InlineQuery], streamkey: typing.Optional[str] = None, chatid: typing.Optional[int] = None) -> bool:
     if chatid and streamkey:
         return Room.exists(ownerid=event.sender.id, streamkey=streamkey, chatid=chatid)
     elif chatid:

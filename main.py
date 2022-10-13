@@ -7,7 +7,7 @@ from json import loads, dumps
 from telethon import TelegramClient, Button
 from telethon.events import NewMessage, InlineQuery
 
-from utils import headers, extract_url, get_videos, parse_answer
+from utils import headers, extract_url, parse_answer
 from database import get_value, create, exist
 
 
@@ -35,7 +35,17 @@ async def main(config):
 
     @client.on(NewMessage(pattern='/start'))
     async def start(event):
-        await event.reply('Witam', buttons=[Button.inline('Test')])
+        await event.reply('Hello there!\n\n'
+                          'Use this bot for creating, updating and playing instantly videos on Watch2Gather platform.\n\n'
+                          'You can use it directly:\n'
+                          '`/new youtube video link` for creating a room with shared video\n'
+                          '`/update youtube video link` for updating your existing room with shared video\n'
+                          '`/play youtube video link` for immediate play of shared video\n\n'
+                          'or via inline commands:\n'
+                          '`/new youtube_search_query` for creating a room with video picked from list\n'
+                          '`/update youtube_search_query` for updating existing room with video picked from the list\n'
+                          '`/play youtube_search_query` for immediate play of video picked from the list.\n\n'
+                          'Have fun and enjoy your time with friends!')
 
     @client.on(NewMessage(pattern='/new', incoming=True))
     async def new_room(event):
@@ -87,6 +97,9 @@ async def main(config):
 
             body = {"w2g_api_key": api_key,
                     "add_items": [{"url": url, "title": " "}]}
+
+            # if event.is_reply:
+            #     mess = await client.get_messages(ids=[event.reply_to_msg_id])
 
             async with session.post(
                     f'https://api.w2g.tv/rooms/{get_value(event=event, key="streamkey")}/playlists/current/playlist_items/sync_update',
